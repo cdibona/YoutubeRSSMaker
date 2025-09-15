@@ -33,6 +33,7 @@ from typing import Dict, List, Optional, Tuple
 
 import requests
 from dotenv import load_dotenv
+from youtube_transcript_api import NoTranscriptFound, TranscriptsDisabled, YouTubeTranscriptApi
 
 load_dotenv()
 
@@ -85,6 +86,38 @@ def pick_best_thumb(thumbs: Dict) -> Tuple[str, int, int]:
             return (t.get("url", ""), t.get("width", 0), t.get("height", 0))
     k, t = next(iter(thumbs.items()))
     return (t.get("url", ""), t.get("width", 0), t.get("height", 0))
+
+def fetch_captions(video_id: str, lang: str = "en") -> str:
+    """Fetch captions for a video in the preferred language, if available."""
+    languages = [lang]
+    normalized = lang.lower()
+    fallback_candidates = []
+    if normalized not in {"en", "en-us"}:
+        fallback_candidates.extend(["en", "en-US"])
+    for candidate in fallback_candidates:
+        if candidate not in languages:
+            languages.append(candidate)
+
+    try:
+        transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=languages)
+    except TranscriptsDisabled:
+        return ""
+    except NoTranscriptFound:
+        try:
+            transcript = YouTubeTranscriptApi.get_transcript(video_id)
+        except (TranscriptsDisabled, NoTranscriptFound):
+            return ""
+        except Exception:
+            return ""
+    except Exception:
+        return ""
+
+    lines: List[str] = []
+    for entry in transcript:
+        text = entry.get("text", "").strip()
+        if text:
+            lines.append(text.replace("\n", " "))
+    return " ".join(lines).strip()
 
 # --- API Calls ----------------------------------------------------------------
 
@@ -330,7 +363,14 @@ def build_rss(channel: Dict, videos: List[Dict], channel_url: Optional[str]=None
 
         meta_html = "<br/>".join(html.escape(bit, quote=False) for bit in meta_bits)
         desc_html = f"{meta_html}<br/><br/>{html.escape(vdesc or '', quote=False)}"
+        captions_text = v.get("captions")
+        caption_html = None
+        if captions_text:
+            caption_html = html.escape(captions_text, quote=False).replace("\n", "<br/>")
+            desc_html = f"{desc_html}<br/><br/><strong>Captions:</strong><br/>{caption_html}"
         rss.append(f"<description>{desc_html}</description>")
+        if caption_html:
+            rss.append(f"<media:subtitle>{caption_html}</media:subtitle>")
 
         if turl:
             rss.append(f'<media:thumbnail url="{html.escape(turl, quote=True)}" width="{tw}" height="{th}"/>')
@@ -350,6 +390,12 @@ def main():
     parser.add_argument("--api-key", default=os.environ.get("YT_API_KEY"), help="YouTube Data API v3 key (or set YT_API_KEY)")
     parser.add_argument("--out", default="-", help="Output RSS file path (default: stdout)")
     parser.add_argument("--descending", action="store_true", help="Sort newest first (default is oldest first)")
+    parser.add_argument("--include-captions", action="store_true", help="Include video captions/transcripts in the RSS feed")
+    parser.add_argument(
+        "--caption-language",
+        default="en",
+        help="Preferred caption language code when including captions (default: en)",
+    )
     args = parser.parse_args()
 
     if not args.api_key:
@@ -363,6 +409,12 @@ def main():
         uploads_pid = get_uploads_playlist_id(channel_resource)
         video_ids = fetch_all_playlist_video_ids(session, args.api_key, uploads_pid)
         videos = fetch_video_details(session, args.api_key, video_ids)
+        if args.include_captions:
+            preferred_lang = (args.caption_language or "en").strip() or "en"
+            for video in videos:
+                caption_text = fetch_captions(video["id"], lang=preferred_lang)
+                if caption_text:
+                    video["captions"] = caption_text
         if args.descending:
             videos = list(reversed(videos))
         rss_xml = build_rss(channel_resource, videos, channel_url=args.channel if args.channel.startswith("http") or args.channel.startswith("@") else None)
