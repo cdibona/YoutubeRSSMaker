@@ -42,6 +42,13 @@ Install dependencies (from `requirements.txt`):
 pip install -r requirements.txt
 ```
 
+Copy the environment template and add your API key:
+
+```bash
+cp .env.template .env
+# then edit .env and set YT_API_KEY
+```
+
 ---
 
 ## 🔑 API Key Setup
@@ -50,8 +57,9 @@ pip install -r requirements.txt
 2. Create a new project (if needed).
 3. Enable the **YouTube Data API v3**.
 4. Create an **API key**.
-5. Either:
-   - Export it as an environment variable:
+5. Make it available to the script:
+   - Copy `.env.template` to `.env` and set `YT_API_KEY=YOUR_API_KEY`
+   - Or export it as an environment variable:
      ```bash
      export YT_API_KEY="YOUR_API_KEY"
      ```
@@ -71,7 +79,10 @@ python youtube_channel_to_rss.py --channel <CHANNEL> [options]
 # Using a custom URL
 python youtube_channel_to_rss.py --channel "https://www.youtube.com/c/thisoldtony" --api-key YOUR_KEY --out thisoldtony.rss
 
-# Using a handle with env var
+# Using a handle with API key from .env
+python youtube_channel_to_rss.py --channel @thisoldtony --out feed.rss
+
+# Using a handle with an exported env var
 export YT_API_KEY=YOUR_KEY
 python youtube_channel_to_rss.py --channel @thisoldtony --out feed.rss
 
