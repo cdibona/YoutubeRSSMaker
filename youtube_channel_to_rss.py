@@ -32,6 +32,9 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()
 
 YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3"
 
