@@ -21,6 +21,7 @@ It uses the [YouTube Data API v3](https://developers.google.com/youtube/v3) to f
   - **Views** and **likes** (if available)
   - **Thumbnails** (via `<media:thumbnail>`)
   - `<media:content>` entries with duration metadata
+  - Optional **captions/transcripts** embedded in `<description>` and `<media:subtitle>`
 - Channel metadata:
   - Channel title, description, publish date
   - Subscriber/video/view counts (as comments)
@@ -88,16 +89,21 @@ python youtube_channel_to_rss.py --channel @thisoldtony --out feed.rss
 
 # Using a raw channel ID, newest-first
 python youtube_channel_to_rss.py --channel UCxxxxxxx --descending --out latest.rss
+
+# Including English captions in the feed
+python youtube_channel_to_rss.py --channel UCxxxxxxx --include-captions --caption-language en --out captions.rss
 ```
 
 ### Arguments
 
-| Option         | Description                                                                 |
-|----------------|-----------------------------------------------------------------------------|
-| `--channel`    | Channel URL, @handle, /channel/ID, /user/NAME, /c/NAME, or search query     |
-| `--api-key`    | YouTube API key (or set `YT_API_KEY` env var)                               |
-| `--out`        | Output file path (default: `stdout`)                                        |
-| `--descending` | Sort newest-first (default is oldest-first)                                 |
+| Option               | Description                                                                 |
+|----------------------|-----------------------------------------------------------------------------|
+| `--channel`          | Channel URL, @handle, /channel/ID, /user/NAME, /c/NAME, or search query     |
+| `--api-key`          | YouTube API key (or set `YT_API_KEY` env var)                               |
+| `--out`              | Output file path (default: `stdout`)                                        |
+| `--descending`       | Sort newest-first (default is oldest-first)                                 |
+| `--include-captions` | Fetch and embed captions/transcripts for each video                         |
+| `--caption-language` | Preferred caption language code (default: `en`; used with `--include-captions`) |
 
 ---
 
