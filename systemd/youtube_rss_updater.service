@@ -1,0 +1,14 @@
+[Unit]
+Description=Update YouTube RSS feeds defined in YoutubeRSSMaker/.env
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+# Update these paths to match your deployment.
+WorkingDirectory=/srv/YoutubeRSSMaker
+EnvironmentFile=/srv/YoutubeRSSMaker/.env
+ExecStart=/usr/bin/env python3 /srv/YoutubeRSSMaker/update_feeds.py
+
+[Install]
+WantedBy=multi-user.target

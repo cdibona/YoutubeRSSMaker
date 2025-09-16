@@ -116,6 +116,78 @@ python youtube_channel_to_rss.py --channel UCxxxxxxx --include-captions --allow-
 
 ## 📄 Output
 
+---
+
+## 🔁 Automating multiple feeds
+
+The repository includes `update_feeds.py`, a helper that reads a list of channels
+from your `.env` file and regenerates all of their feeds in one shot. This is
+the easiest way to keep a local clone of
+[cdibona/opensaucerssfeeds](https://github.com/cdibona/opensaucerssfeeds)
+up-to-date.
+
+1. Copy the sample configuration and edit it:
+   ```bash
+   cp .env.template .env
+   ```
+2. Edit `.env` and set at least:
+   * `YT_API_KEY` – your YouTube Data API key.
+   * `OUTPUT_DIRECTORY` – directory where feeds should be written (e.g. the
+     `feeds/` folder inside your `opensaucerssfeeds` clone).
+   * `CHANNELS` – list of channels to refresh (JSON is recommended). The
+     default template includes the feeds we keep in sync for
+     [opensaucerssfeeds](https://github.com/cdibona/opensaucerssfeeds):
+
+     - `@thisoldtony → thisoldtony.xml`
+     - `@nilered → nilered.xml`
+     - `@williamossman → william-ossman.xml`
+     - `@peterbrownwastaken → peter-brown.xml`
+     - `@shortcircuit → short-circuit.xml`
+     - `@technologyconnections → technology-connections.xml`
+     - `@agingwheels → aging-wheels.xml`
+     - `@nileblue → nileblue.xml`
+     - `@VeraRubinObservatory → vera-c-rubin-observatory.xml`
+
+     Adjust the list to suit your deployment. A JSON snippet looks like:
+     ```env
+     CHANNELS='[
+       {"channel": "@ThisOldTony", "output": "thisoldtony.xml"},
+       {"channel": "https://www.youtube.com/channel/UC6107grRI4m0o2-emgoDnAA",
+        "output": "numberphile.xml",
+        "oldest_first": false}
+     ]'
+     ```
+     A simpler format is also supported: `CHANNELS=@thisoldtony>thisoldtony.xml,@veritasium>science/veritasium.xml`.
+
+3. Run the batch updater to generate all feeds once:
+   ```bash
+   python update_feeds.py
+   ```
+   The script re-reads `.env` on each run. Use `--loop` (or set `RUN_CONTINUOUSLY=true` in `.env`)
+   to keep it running continuously. You can adjust the refresh cadence with
+   `--interval`, `REFRESH_INTERVAL_SECONDS`, or `REFRESH_INTERVAL_MINUTES`.
+
+### systemd service
+
+Sample unit files are provided in [`systemd/`](systemd/).
+Adjust the paths inside the files to match your environment, then install them:
+
+```bash
+sudo cp systemd/youtube_rss_updater.service /etc/systemd/system/
+sudo cp systemd/youtube_rss_updater.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now youtube_rss_updater.timer
+```
+
+The timer triggers the updater hourly (after a 10-minute delay on boot). The
+service runs `update_feeds.py`, which reads `.env` and writes feeds into your
+`OUTPUT_DIRECTORY`. If you add or remove channels, edit `.env` and either wait
+for the next timer tick or run the service manually:
+
+```bash
+sudo systemctl start youtube_rss_updater.service
+```
+
 Generates a valid RSS 2.0 XML feed:
 
 ```xml
