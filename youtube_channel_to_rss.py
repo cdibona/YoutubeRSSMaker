@@ -28,16 +28,28 @@ import re
 import sys
 import time
 import html
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
 import requests
 from dotenv import load_dotenv
-from youtube_transcript_api import NoTranscriptFound, TranscriptsDisabled, YouTubeTranscriptApi
+try:
+    from youtube_transcript_api import NoTranscriptFound, TranscriptsDisabled, YouTubeTranscriptApi
+except ImportError:  # pragma: no cover - optional dependency
+    NoTranscriptFound = TranscriptsDisabled = Exception  # type: ignore
+    YouTubeTranscriptApi = None  # type: ignore
 
 load_dotenv()
 
 YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3"
+
+
+@dataclass
+class FeedResult:
+    rss: str
+    channel: Dict
+    videos: List[Dict]
 
 # --- Helpers -----------------------------------------------------------------
 
@@ -427,6 +439,57 @@ def build_rss(channel: Dict, videos: List[Dict], channel_url: Optional[str]=None
 
 # --- Main ---------------------------------------------------------------------
 
+def generate_feed_for_channel(
+    channel_identifier: str,
+    api_key: str,
+    *,
+    include_captions: bool = False,
+    caption_language: str = "en",
+    allow_generated_captions: bool = False,
+    oldest_first: bool = False,
+    channel_url_override: Optional[str] = None,
+) -> FeedResult:
+    if not api_key:
+        raise ValueError("API key required. Pass --api-key or set YT_API_KEY.")
+
+    with requests.Session() as session:
+        _channel_id, channel_resource = resolve_channel_id(session, api_key, channel_identifier)
+        uploads_pid = get_uploads_playlist_id(channel_resource)
+        video_ids = fetch_all_playlist_video_ids(session, api_key, uploads_pid)
+        videos = fetch_video_details(session, api_key, video_ids)
+
+        if include_captions and YouTubeTranscriptApi is None:
+            raise RuntimeError(
+                "Captions were requested but youtube-transcript-api is not installed."
+                " Install youtube-transcript-api or run without caption support."
+            )
+
+        if include_captions:
+            preferred_lang = (caption_language or "en").strip() or "en"
+            for video in videos:
+                caption_text = fetch_captions(
+                    video["id"],
+                    lang=preferred_lang,
+                    allow_generated=allow_generated_captions,
+                )
+                if caption_text:
+                    video["captions"] = caption_text
+
+        if oldest_first:
+            videos = list(reversed(videos))
+
+    channel_link = channel_url_override
+    if channel_link is None:
+        if channel_identifier.startswith("http://") or channel_identifier.startswith("https://"):
+            channel_link = channel_identifier
+        elif channel_identifier.startswith("@"):
+            channel_link = f"https://www.youtube.com/{channel_identifier}"
+
+    rss_xml = build_rss(channel_resource, videos, channel_url=channel_link)
+
+    return FeedResult(rss=rss_xml, channel=channel_resource, videos=videos)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Create an RSS feed for a YouTube channel.")
     parser.add_argument("--channel", required=True, help="Channel URL (@handle, /channel/ID, /user/NAME, /c/NAME), channel ID, or search query")
@@ -455,26 +518,16 @@ def main():
         print("Error: API key required. Pass --api-key or set YT_API_KEY.", file=sys.stderr)
         sys.exit(2)
 
-    session = requests.Session()
-
     try:
-        channel_id, channel_resource = resolve_channel_id(session, args.api_key, args.channel)
-        uploads_pid = get_uploads_playlist_id(channel_resource)
-        video_ids = fetch_all_playlist_video_ids(session, args.api_key, uploads_pid)
-        videos = fetch_video_details(session, args.api_key, video_ids)
-        if args.include_captions:
-            preferred_lang = (args.caption_language or "en").strip() or "en"
-            for video in videos:
-                caption_text = fetch_captions(
-                    video["id"],
-                    lang=preferred_lang,
-                    allow_generated=args.allow_generated_captions,
-                )
-                if caption_text:
-                    video["captions"] = caption_text
-        if args.oldest_first:
-            videos = list(reversed(videos))
-        rss_xml = build_rss(channel_resource, videos, channel_url=args.channel if args.channel.startswith("http") or args.channel.startswith("@") else None)
+        feed_result = generate_feed_for_channel(
+            args.channel,
+            args.api_key,
+            include_captions=args.include_captions,
+            caption_language=args.caption_language,
+            allow_generated_captions=args.allow_generated_captions,
+            oldest_first=args.oldest_first,
+        )
+        rss_xml = feed_result.rss
     except requests.HTTPError as e:
         resp_text = getattr(e, "response", None).text if getattr(e, "response", None) else ""
         print(f"HTTP error from YouTube API: {e}\nResponse: {resp_text}", file=sys.stderr)
