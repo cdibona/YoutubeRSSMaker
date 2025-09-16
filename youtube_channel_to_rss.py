@@ -443,6 +443,7 @@ def main():
         default="en",
         help="Preferred caption language code when including captions (default: en)",
     )
+
     parser.add_argument(
         "--allow-generated-captions",
         action="store_true",
