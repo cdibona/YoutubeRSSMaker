@@ -21,7 +21,7 @@ It uses the [YouTube Data API v3](https://developers.google.com/youtube/v3) to f
   - **Views** and **likes** (if available)
   - **Thumbnails** (via `<media:thumbnail>`)
   - `<media:content>` entries with duration metadata
-  - Optional **captions/transcripts** embedded in `<description>` and `<media:subtitle>`
+  - Optional **captions/transcripts** (manual or opt-in auto-generated) embedded in `<description>` and `<media:subtitle>`
 - Channel metadata:
   - Channel title, description, publish date
   - Subscriber/video/view counts (as comments)
@@ -87,11 +87,17 @@ python youtube_channel_to_rss.py --channel @thisoldtony --out feed.rss
 export YT_API_KEY=YOUR_KEY
 python youtube_channel_to_rss.py --channel @thisoldtony --out feed.rss
 
-# Using a raw channel ID, newest-first
-python youtube_channel_to_rss.py --channel UCxxxxxxx --descending --out latest.rss
+# Using a raw channel ID (newest videos come first by default)
+python youtube_channel_to_rss.py --channel UCxxxxxxx --out latest.rss
+
+# Flipping the feed to oldest-first order
+python youtube_channel_to_rss.py --channel UCxxxxxxx --oldest-first --out archive.rss
 
 # Including English captions in the feed
 python youtube_channel_to_rss.py --channel UCxxxxxxx --include-captions --caption-language en --out captions.rss
+
+# Including captions with auto-generated fallback
+python youtube_channel_to_rss.py --channel UCxxxxxxx --include-captions --allow-generated-captions --out captions.rss
 ```
 
 ### Arguments
@@ -101,9 +107,10 @@ python youtube_channel_to_rss.py --channel UCxxxxxxx --include-captions --captio
 | `--channel`          | Channel URL, @handle, /channel/ID, /user/NAME, /c/NAME, or search query     |
 | `--api-key`          | YouTube API key (or set `YT_API_KEY` env var)                               |
 | `--out`              | Output file path (default: `stdout`)                                        |
-| `--descending`       | Sort newest-first (default is oldest-first)                                 |
+| `--oldest-first`     | Sort the feed so the oldest uploads appear first (default is newest-first)  |
 | `--include-captions` | Fetch and embed captions/transcripts for each video                         |
 | `--caption-language` | Preferred caption language code (default: `en`; used with `--include-captions`) |
+| `--allow-generated-captions` | Permit falling back to YouTube's auto-generated captions (used with `--include-captions`) |
 
 ---
 
