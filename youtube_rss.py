@@ -88,6 +88,7 @@ Examples:
     # Stats command
     stats_parser = subparsers.add_parser("stats", help="Show feed statistics")
     stats_parser.add_argument("--db-path", help="Database path")
+    stats_parser.add_argument("--send-discord", action="store_true", help="Send stats to Discord testing channel")
 
     # Cleanup command
     cleanup_parser = subparsers.add_parser("cleanup", help="Remove old videos")
@@ -152,7 +153,7 @@ Examples:
             ) else 1
 
         elif args.command == "stats":
-            updater.show_stats()
+            updater.show_stats(send_to_discord=args.send_discord)
             return 0
 
         elif args.command == "cleanup":

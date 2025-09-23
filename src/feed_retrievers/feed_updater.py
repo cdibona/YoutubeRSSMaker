@@ -134,6 +134,13 @@ class FeedUpdater:
                 self.logger.report_feed_operation(report)
 
         print(f"Update complete: {success_count}/{len(feeds)} feeds updated, {total_new_videos} new videos total")
+
+        # Send stats to Discord after update
+        try:
+            self._send_update_stats_to_discord(feeds, success_count, total_new_videos)
+        except Exception as e:
+            print(f"Note: Could not send Discord stats: {e}")
+
         return success_count > 0
 
     def _fetch_new_videos(self, feed: StoredFeed, api_key: str) -> List[Dict[str, Any]]:
@@ -253,7 +260,7 @@ class FeedUpdater:
         clean_title = re.sub(r'[-\s]+', '-', clean_title)
         return f"{clean_title.lower()}.xml"
 
-    def show_stats(self):
+    def show_stats(self, send_to_discord: bool = False):
         """Show feed statistics."""
 
         feeds = self.storage.get_all_feeds()
@@ -278,6 +285,15 @@ class FeedUpdater:
                 print(f"  Newest video: {newest}")
             print()
 
+        # Optionally send stats to Discord
+        if send_to_discord:
+            try:
+                print("Sending stats to Discord...")
+                self._send_update_stats_to_discord(feeds, len(feeds), 0)
+                print("✓ Stats sent to Discord testing channel")
+            except Exception as e:
+                print(f"✗ Error sending stats to Discord: {e}")
+
     def cleanup_old_videos(self, days: int) -> bool:
         """Remove videos older than specified days."""
 
@@ -290,3 +306,38 @@ class FeedUpdater:
         except Exception as e:
             print(f"Error during cleanup: {e}")
             return False
+
+    def _send_update_stats_to_discord(self, feeds: List[StoredFeed], success_count: int, total_new_videos: int):
+        """Send update statistics to Discord testing webhook."""
+
+        # Prepare stats data in the format expected by discord_logger
+        feeds_data = []
+        total_videos = 0
+
+        for feed in feeds:
+            video_count = self.storage.get_video_count_for_channel(feed.channel_id)
+            total_videos += video_count
+
+            feeds_data.append({
+                "channel_title": feed.channel_title,
+                "channel_id": feed.channel_id,
+                "user_id": feed.user_id,
+                "video_count": video_count,
+                "last_updated": feed.last_updated.isoformat() if feed.last_updated else None,
+                "query_count": getattr(feed, 'query_count', 0)
+            })
+
+        stats_data = {
+            "total_feeds": len(feeds),
+            "total_videos": total_videos,
+            "feeds": feeds_data,
+            "update_summary": {
+                "successful_feeds": success_count,
+                "total_feeds": len(feeds),
+                "new_videos_found": total_new_videos,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        }
+
+        # Send to testing webhook (stats channel)
+        self.logger.report_system_stats_to_testing(stats_data)
