@@ -375,22 +375,99 @@ class FeedStorage:
 
             return result.rowcount > 0
 
-    def cleanup_old_videos(self, days: int = 365) -> int:
-        """Remove videos older than specified days. Returns count of removed videos."""
-        cutoff = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-        cutoff = cutoff.replace(day=cutoff.day - days)
-
+    def cleanup_old_videos(self, cutoff_date: datetime) -> int:
+        """Remove videos older than specified cutoff date. Returns count of removed videos."""
         with sqlite3.connect(self.db_path) as conn:
             result = conn.execute("""
                 DELETE FROM videos
                 WHERE published_at < ?
-            """, (cutoff.isoformat(),))
+            """, (cutoff_date.isoformat(),))
 
             deleted_count = result.rowcount
             conn.commit()
 
-            logger.info(f"Cleaned up {deleted_count} videos older than {days} days")
+            logger.info(f"Cleaned up {deleted_count} videos older than {cutoff_date}")
             return deleted_count
+
+    def get_video_ids_for_channel(self, channel_id: str) -> List[str]:
+        """Get all video IDs for a channel."""
+        with sqlite3.connect(self.db_path) as conn:
+            rows = conn.execute("""
+                SELECT video_id FROM videos WHERE channel_id = ?
+            """, (channel_id,)).fetchall()
+            return [row[0] for row in rows]
+
+    def store_video(self, video: StoredVideo):
+        """Store a single video object."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO videos
+                (video_id, channel_id, title, description, published_at, duration_seconds,
+                 view_count, like_count, thumbnail_url, captions, first_seen)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                video.video_id,
+                video.channel_id,
+                video.title,
+                video.description,
+                video.published_at.isoformat(),
+                video.duration_seconds,
+                video.view_count,
+                video.like_count,
+                video.thumbnail_url,
+                video.captions,
+                video.first_seen.isoformat()
+            ))
+            conn.commit()
+
+    def update_feed_last_updated(self, channel_id: str):
+        """Update the last_updated timestamp for a feed."""
+        now = datetime.now(timezone.utc)
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("""
+                UPDATE feeds SET last_updated = ? WHERE channel_id = ?
+            """, (now.isoformat(), channel_id))
+            conn.commit()
+
+    def get_videos_for_channel(self, channel_id: str, oldest_first: bool = False, limit: Optional[int] = None) -> List[StoredVideo]:
+        """Get videos for a channel, optionally sorted and limited."""
+        order = "ASC" if oldest_first else "DESC"
+
+        with sqlite3.connect(self.db_path) as conn:
+            query = f"""
+                SELECT video_id, channel_id, title, description, published_at,
+                       duration_seconds, view_count, like_count, thumbnail_url, captions, first_seen
+                FROM videos
+                WHERE channel_id = ?
+                ORDER BY published_at {order}
+            """
+
+            if limit:
+                query += f" LIMIT {limit}"
+
+            rows = conn.execute(query, (channel_id,)).fetchall()
+
+            return [StoredVideo(
+                video_id=row[0],
+                channel_id=row[1],
+                title=row[2],
+                description=row[3],
+                published_at=datetime.fromisoformat(row[4]),
+                duration_seconds=row[5],
+                view_count=row[6],
+                like_count=row[7],
+                thumbnail_url=row[8],
+                captions=row[9],
+                first_seen=datetime.fromisoformat(row[10])
+            ) for row in rows]
+
+    def get_video_count_for_channel(self, channel_id: str) -> int:
+        """Get the count of videos for a channel."""
+        with sqlite3.connect(self.db_path) as conn:
+            result = conn.execute("""
+                SELECT COUNT(*) FROM videos WHERE channel_id = ?
+            """, (channel_id,)).fetchone()
+            return result[0] if result else 0
 
     def _iso8601_duration_to_seconds(self, iso_dur: str) -> int:
         """Convert ISO 8601 duration (e.g., PT1H2M3S) to seconds."""

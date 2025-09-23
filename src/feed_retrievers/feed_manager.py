@@ -21,10 +21,11 @@ from typing import Optional
 from dotenv import load_dotenv
 import requests
 
-from feed_storage import FeedStorage
-from youtube_channel_to_rss import resolve_channel_id
-from update_feeds import ChannelConfig
-from discord_logger import get_logger, FeedReport, APIUsageReport
+sys.path.append(str(Path(__file__).parent.parent))
+
+from database.feed_storage import FeedStorage
+from .youtube_channel_to_rss import resolve_channel_id
+from discord_interactions.discord_logger import get_logger, FeedReport, APIUsageReport
 
 
 class FeedManager:
@@ -84,13 +85,17 @@ class FeedManager:
 
             # Generate default output filename if none provided
             if not output_filename:
-                from update_feeds import slugify_channel
+                # Generate slugified filename
+                import re
+                def slugify_channel(name):
+                    clean = re.sub(r'[^\w\s-]', '', name)
+                    return re.sub(r'[-\s]+', '-', clean).lower() + '.xml'
                 output_filename = slugify_channel(channel_title)
                 print(f"Using default filename: {output_filename}")
 
             # Validate that the channel has an uploads playlist
             try:
-                from youtube_channel_to_rss import get_uploads_playlist_id, fetch_all_playlist_video_ids
+                from .youtube_channel_to_rss import get_uploads_playlist_id, fetch_all_playlist_video_ids
                 uploads_playlist_id = get_uploads_playlist_id(channel_resource)
 
                 # Track API usage for playlist items
