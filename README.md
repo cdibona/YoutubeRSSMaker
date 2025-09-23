@@ -1,30 +1,28 @@
-# YouTube Channel → RSS Feed Generator
+# YouTube RSS Maker
 
-This Python script creates an **RSS feed** for any YouTube channel, including video metadata such as title, description, duration, views, likes, and thumbnails.  
+Modern YouTube RSS feed generator with **incremental updates** and **multi-user support**. Create RSS feeds for any YouTube channel with intelligent storage that only fetches new videos since your last check.
 
-It uses the [YouTube Data API v3](https://developers.google.com/youtube/v3) to fetch all videos from a channel’s **Uploads** playlist and formats them as a valid **RSS 2.0** feed with [Media RSS](https://www.rssboard.org/media-rss) extensions.
+This system uses the [YouTube Data API v3](https://developers.google.com/youtube/v3) to fetch videos and stores them in SQLite for efficient incremental updates, supporting multiple users with their own API keys.
 
 ---
 
 ## ✨ Features
 
-- Accepts:
-  - Channel URLs (`/channel/UC…`, `/user/NAME`, `/c/CUSTOM`)
-  - Handles (`@username`)
-  - Raw channel IDs
-  - Even plain search queries
-- Fetches **all videos** from the channel
-- Includes:
-  - Video **title, link, description**
-  - **Duration** (`HH:MM:SS` and seconds)
-  - **Publish date**
-  - **Views** and **likes** (if available)
-  - **Thumbnails** (via `<media:thumbnail>`)
-  - `<media:content>` entries with duration metadata
-  - Optional **captions/transcripts** (manual or opt-in auto-generated) embedded in `<description>` and `<media:subtitle>`
-- Channel metadata:
-  - Channel title, description, publish date
-  - Subscriber/video/view counts (as comments)
+### 🚀 **Modern Incremental System (Default)**
+- **Incremental Updates**: Only fetches new videos since last check
+- **Multi-User Support**: Different users can manage feeds with their own API keys
+- **SQLite Storage**: Fast, persistent storage of video metadata
+- **Automatic Deduplication**: Prevents duplicate video entries
+- **Feed Management**: Add, remove, and list feeds with simple commands
+- **Reduced API Usage**: Dramatically lower YouTube API quota consumption
+
+### 📺 **Rich Video Metadata**
+- **Channel Support**: URLs (`/channel/UC…`, `/user/NAME`, `/c/CUSTOM`), handles (`@username`), IDs, search queries
+- **Complete Video Data**: Title, link, description, duration (`HH:MM:SS` and seconds), publish date
+- **Statistics**: Views and likes (when available)
+- **Media Elements**: Thumbnails (`<media:thumbnail>`), content metadata (`<media:content>`)
+- **Optional Captions**: Manual or auto-generated transcripts in `<description>` and `<media:subtitle>`
+- **Channel Metadata**: Title, description, subscriber/video/view counts
 
 ---
 
@@ -70,47 +68,75 @@ cp .env.template .env
 
 ## 🚀 Usage
 
-```bash
-python youtube_channel_to_rss.py --channel <CHANNEL> [options]
-```
-
-### Examples
+### **Quick Start (Recommended)**
 
 ```bash
-# Using a custom URL
-python youtube_channel_to_rss.py --channel "https://www.youtube.com/c/thisoldtony" --api-key YOUR_KEY --out thisoldtony.rss
+# 1. Add your first feed
+python youtube_rss.py add @TechnologyConnections tech-connections.xml --user alice --api-key YOUR_KEY
 
-# Using a handle with API key from .env
-python youtube_channel_to_rss.py --channel @thisoldtony --out feed.rss
+# 2. Update all feeds (only fetches new videos)
+python youtube_rss.py update
 
-# Using a handle with an exported env var
-export YT_API_KEY=YOUR_KEY
-python youtube_channel_to_rss.py --channel @thisoldtony --out feed.rss
-
-# Using a raw channel ID (newest videos come first by default)
-python youtube_channel_to_rss.py --channel UCxxxxxxx --out latest.rss
-
-# Flipping the feed to oldest-first order
-python youtube_channel_to_rss.py --channel UCxxxxxxx --oldest-first --out archive.rss
-
-# Including English captions in the feed
-python youtube_channel_to_rss.py --channel UCxxxxxxx --include-captions --caption-language en --out captions.rss
-
-# Including captions with auto-generated fallback
-python youtube_channel_to_rss.py --channel UCxxxxxxx --include-captions --allow-generated-captions --out captions.rss
+# 3. List your feeds
+python youtube_rss.py list
 ```
 
-### Arguments
+### **Common Operations**
 
-| Option               | Description                                                                 |
-|----------------------|-----------------------------------------------------------------------------|
-| `--channel`          | Channel URL, @handle, /channel/ID, /user/NAME, /c/NAME, or search query     |
-| `--api-key`          | YouTube API key (or set `YT_API_KEY` env var)                               |
-| `--out`              | Output file path (default: `stdout`)                                        |
-| `--oldest-first`     | Sort the feed so the oldest uploads appear first (default is newest-first)  |
-| `--include-captions` | Fetch and embed captions/transcripts for each video                         |
-| `--caption-language` | Preferred caption language code (default: `en`; used with `--include-captions`) |
-| `--allow-generated-captions` | Permit falling back to YouTube's auto-generated captions (used with `--include-captions`) |
+```bash
+# Add feeds for different users
+python youtube_rss.py add @ThisOldTony this-old-tony.xml --user alice --api-key ALICE_KEY
+python youtube_rss.py add @NileRed nilered.xml --user bob --api-key BOB_KEY
+
+# Update all feeds using their stored API keys
+python youtube_rss.py update
+
+# List feeds for a specific user
+python youtube_rss.py list --user alice
+
+# Remove a feed
+python youtube_rss.py remove @TechnologyConnections --user alice
+
+# View feed statistics
+python youtube_rss.py stats
+
+# Clean up old videos
+python youtube_rss.py cleanup 365
+```
+
+### **Advanced Usage**
+
+```bash
+# Add feed with captions and custom settings
+python youtube_rss.py add @VeritasiumVideos veritasium.xml \
+  --include-captions --caption-language en --oldest-first
+
+# Continuous updates (runs forever, checking every hour)
+python youtube_rss.py update --loop --interval 3600
+
+# Single channel generation (legacy mode)
+python youtube_rss.py channel @TechnologyConnections --out single-feed.xml
+```
+
+### Commands Reference
+
+| Command | Description |
+|---------|-------------|
+| `add CHANNEL OUTPUT` | Add new feed with user and API key |
+| `update` | Update all feeds incrementally |
+| `list` | Show all feeds or filter by user |
+| `remove CHANNEL` | Remove a feed (with user permission check) |
+| `stats` | Display feed and video statistics |
+| `cleanup DAYS` | Remove videos older than N days |
+| `channel CHANNEL` | Single-channel mode (legacy) |
+
+| Common Options | Description |
+|----------------|-------------|
+| `--user USER` | User ID for feed ownership (default: DefaultUser) |
+| `--api-key KEY` | YouTube API key for this operation |
+| `--db-path PATH` | Custom database location |
+| `--include-captions` | Fetch and embed video captions |
+| `--oldest-first` | Sort videos oldest-first instead of newest-first |
 
 ---
 
@@ -118,75 +144,39 @@ python youtube_channel_to_rss.py --channel UCxxxxxxx --include-captions --allow-
 
 ---
 
-## 🔁 Automating multiple feeds
+## 🔁 Migration from Legacy System
 
-The repository includes `update_feeds.py`, a helper that reads a list of channels
-from your `.env` file and regenerates all of their feeds in one shot. This is
-the easiest way to keep a local clone of
-[cdibona/opensaucerssfeeds](https://github.com/cdibona/opensaucerssfeeds)
-up-to-date.
+If you're upgrading from the old `update_feeds.py` system, you can migrate easily:
 
-1. Copy the sample configuration and edit it:
-   ```bash
-   cp .env.template .env
-   ```
-2. Edit `.env` and set at least:
-   * `YT_API_KEY` – your YouTube Data API key.
-   * `OUTPUT_DIRECTORY` – directory where feeds should be written (e.g. the
-     `feeds/` folder inside your `opensaucerssfeeds` clone).
-   * `CHANNELS` – list of channels to refresh (JSON is recommended). The
-     default template includes the feeds we keep in sync for
-     [opensaucerssfeeds](https://github.com/cdibona/opensaucerssfeeds):
-
-     - `@thisoldtony → thisoldtony.xml`
-     - `@nilered → nilered.xml`
-     - `@williamossman → william-ossman.xml`
-     - `@peterbrownwastaken → peter-brown.xml`
-     - `@shortcircuit → short-circuit.xml`
-     - `@technologyconnections → technology-connections.xml`
-     - `@agingwheels → aging-wheels.xml`
-     - `@nileblue → nileblue.xml`
-     - `@VeraRubinObservatory → vera-c-rubin-observatory.xml`
-
-     Adjust the list to suit your deployment. A JSON snippet looks like:
-     ```env
-     CHANNELS='[
-       {"channel": "@ThisOldTony", "output": "thisoldtony.xml"},
-       {"channel": "https://www.youtube.com/channel/UC6107grRI4m0o2-emgoDnAA",
-        "output": "numberphile.xml",
-        "oldest_first": false}
-     ]'
-     ```
-     A simpler format is also supported: `CHANNELS=@thisoldtony>thisoldtony.xml,@veritasium>science/veritasium.xml`.
-
-3. Run the batch updater to generate all feeds once:
-   ```bash
-   python update_feeds.py
-   ```
-   The script re-reads `.env` on each run. Use `--loop` (or set `RUN_CONTINUOUSLY=true` in `.env`)
-   to keep it running continuously. You can adjust the refresh cadence with
-   `--interval`, `REFRESH_INTERVAL_SECONDS`, or `REFRESH_INTERVAL_MINUTES`.
-
-### systemd service
-
-Sample unit files are provided in [`systemd/`](systemd/).
-Adjust the paths inside the files to match your environment, then install them:
+### **Option 1: Use New System (Recommended)**
 
 ```bash
-sudo cp systemd/youtube_rss_updater.service /etc/systemd/system/
-sudo cp systemd/youtube_rss_updater.timer /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now youtube_rss_updater.timer
+# Add your existing feeds to the new system
+python youtube_rss.py add @thisoldtony thisoldtony.xml --api-key YOUR_KEY
+python youtube_rss.py add @nilered nilered.xml --api-key YOUR_KEY
+python youtube_rss.py add @technologyconnections technology-connections.xml --api-key YOUR_KEY
+
+# Then use the new update command
+python youtube_rss.py update
 ```
 
-The timer triggers the updater hourly (after a 10-minute delay on boot). The
-service runs `update_feeds.py`, which reads `.env` and writes feeds into your
-`OUTPUT_DIRECTORY`. If you add or remove channels, edit `.env` and either wait
-for the next timer tick or run the service manually:
+### **Option 2: Keep Using .env Config**
 
 ```bash
-sudo systemctl start youtube_rss_updater.service
+# Use legacy .env CHANNELS configuration
+python youtube_rss.py update --use-env-config
 ```
+
+The `.env` configuration still works:
+```env
+YT_API_KEY=your-key
+OUTPUT_DIRECTORY=./feeds
+CHANNELS='[
+  {"channel": "@ThisOldTony", "output": "thisoldtony.xml"},
+  {"channel": "@NileRed", "output": "nilered.xml"}
+]'
+```
+
 
 Generates a valid RSS 2.0 XML feed:
 
@@ -206,6 +196,50 @@ Generates a valid RSS 2.0 XML feed:
   <media:content url="https://www.youtube.com/watch?v=abcd1234" medium="video" duration="754"/>
 </item>
 ```
+
+---
+
+## 🎯 **How the New System Works**
+
+### **First Run vs. Incremental Updates**
+
+```bash
+# First time adding a feed - fetches ALL videos
+python youtube_rss.py add @TechnologyConnections tech.xml --api-key KEY
+# INFO: First run for Technology Connections - fetching all videos
+# INFO: Stored 219 videos for Technology Connections
+
+# Subsequent updates - only processes NEW videos
+python youtube_rss.py update
+# INFO: Incremental update for Technology Connections (last update: 2024-01-15 10:30:00)
+# INFO: Found 2 new videos for Technology Connections (total: 221)
+```
+
+### **Multi-User Support**
+
+```bash
+# Alice adds feeds with her API key
+python youtube_rss.py add @channel1 feed1.xml --user alice --api-key ALICE_KEY
+python youtube_rss.py add @channel2 feed2.xml --user alice --api-key ALICE_KEY
+
+# Bob adds feeds with his API key
+python youtube_rss.py add @channel3 feed3.xml --user bob --api-key BOB_KEY
+
+# Updates use each feed's stored API key automatically
+python youtube_rss.py update
+# Uses ALICE_KEY for alice's feeds, BOB_KEY for bob's feeds
+
+# Users can only manage their own feeds
+python youtube_rss.py remove @channel1 --user alice  # ✅ Works
+python youtube_rss.py remove @channel1 --user bob    # ❌ Permission denied
+```
+
+### **Performance Benefits**
+
+- **Faster Updates**: Only processes new videos, not entire channel history
+- **Lower API Usage**: Dramatically reduced YouTube API quota consumption
+- **Offline RSS Generation**: Create feeds from stored data without API calls
+- **Automatic Deduplication**: No duplicate videos even if run multiple times
 
 ---
 

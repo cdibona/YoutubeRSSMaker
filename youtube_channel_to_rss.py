@@ -201,7 +201,7 @@ def resolve_channel_id(session: requests.Session, api_key: str, channel: str) ->
             })
             items = data.get("items", [])
             if not items:
-                raise ValueError("Channel not found by ID.")
+                raise ValueError(f"Channel not found: {channel_id}")
             return channel_id, items[0]
 
         # /@handle
@@ -215,7 +215,7 @@ def resolve_channel_id(session: requests.Session, api_key: str, channel: str) ->
             })
             items = data.get("items", [])
             if not items:
-                raise ValueError(f"Channel not found for handle {handle}.")
+                raise ValueError(f"Channel not found: {handle}")
             return items[0]["id"], items[0]
 
         # /user/USERNAME  (legacy)
@@ -229,7 +229,7 @@ def resolve_channel_id(session: requests.Session, api_key: str, channel: str) ->
             })
             items = data.get("items", [])
             if not items:
-                raise ValueError(f"Channel not found for username {username}.")
+                raise ValueError(f"Channel not found: {username}")
             return items[0]["id"], items[0]
 
         # /c/CUSTOM  → use search
@@ -245,7 +245,7 @@ def resolve_channel_id(session: requests.Session, api_key: str, channel: str) ->
             })
             items = data.get("items", [])
             if not items:
-                raise ValueError(f"Channel not found for custom path {custom}.")
+                raise ValueError(f"Channel not found: /c/{custom}")
             channel_id = items[0]["snippet"]["channelId"]
             data2 = yt_get(session, "channels", {
                 "part": "snippet,contentDetails,statistics",
@@ -263,7 +263,7 @@ def resolve_channel_id(session: requests.Session, api_key: str, channel: str) ->
         })
         items = data.get("items", [])
         if not items:
-            raise ValueError(f"Channel not found for handle {channel}.")
+            raise ValueError(f"Channel not found: {channel}")
         return items[0]["id"], items[0]
 
     # UC... channel ID?
@@ -275,7 +275,7 @@ def resolve_channel_id(session: requests.Session, api_key: str, channel: str) ->
         })
         items = data.get("items", [])
         if not items:
-            raise ValueError("Channel not found by ID.")
+            raise ValueError(f"Channel not found: {channel}")
         return channel, items[0]
 
     # Otherwise: treat as search query
@@ -288,7 +288,7 @@ def resolve_channel_id(session: requests.Session, api_key: str, channel: str) ->
     })
     items = data.get("items", [])
     if not items:
-        raise ValueError(f"No channel results for query '{channel}'.")
+        raise ValueError(f"Channel not found: {channel}")
     channel_id = items[0]["snippet"]["channelId"]
     data2 = yt_get(session, "channels", {
         "part": "snippet,contentDetails,statistics",
