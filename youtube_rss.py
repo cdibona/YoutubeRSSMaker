@@ -21,6 +21,10 @@ import argparse
 import os
 from pathlib import Path
 
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
+
 # Add src to Python path for imports
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
@@ -106,11 +110,13 @@ Examples:
         manager = FeedManager(db_path)
 
         if args.command == "add":
+            # Use provided API key or fall back to environment variable
+            api_key = args.api_key or os.getenv('YT_API_KEY')
             return 0 if manager.add_feed(
                 channel_identifier=args.channel,
                 output_filename=args.output,
                 user_id=args.user,
-                api_key=args.api_key,
+                api_key=api_key,
                 include_captions=args.include_captions,
                 caption_language=args.caption_language,
                 allow_generated_captions=args.allow_generated_captions,
@@ -137,9 +143,10 @@ Examples:
 
         if args.command == "update":
             output_dir = args.output_directory or os.getenv('OUTPUT_DIRECTORY', './feeds')
+            fallback_api_key = args.api_key or os.getenv('YT_API_KEY')
             return 0 if updater.update_all_feeds(
                 output_directory=output_dir,
-                fallback_api_key=args.api_key,
+                fallback_api_key=fallback_api_key,
                 loop=args.loop,
                 interval=args.interval or 3600
             ) else 1
